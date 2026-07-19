@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.BLEAnchor" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#FF6200EE</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+    </style>
+</resources>
