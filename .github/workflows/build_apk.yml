@@ -2,18 +2,14 @@ name: Build Android APK
 
 on:
   release:
-    types: [published]        # 发布 Release 时触发
-  workflow_dispatch:          # 也可手动触发
+    types: [published]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
-    defaults:
-      run:
-        working-directory: BLE-Anchor   # 所有步骤默认在该目录执行
 
     steps:
       - name: Checkout code
@@ -28,11 +24,11 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # 关键步骤：安装 Gradle 并自动生成 gradlew 脚本
       - name: Setup Gradle and generate wrapper
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.5
+
       - name: Generate Gradle Wrapper
         run: gradle wrapper --gradle-version 8.5
 
@@ -42,12 +38,11 @@ jobs:
       - name: Rename APK for release
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk BLE-Anchor-v${{ github.event.release.tag_name }}.apk
-        working-directory: BLE-Anchor   # 确保路径正确
 
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
-          files: BLE-Anchor/BLE-Anchor-*.apk
+          files: BLE-Anchor-*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -55,4 +50,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: BLE-Anchor-APK
-          path: BLE-Anchor/app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
