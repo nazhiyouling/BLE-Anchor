@@ -1,0 +1,48 @@
+name: Build Android APK
+
+on:
+  release:
+    types: [published]        # 发布 Release 时触发
+  workflow_dispatch:          # 也可手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Sign APK (optional, use debug signature)
+        run: |
+          # Debug APK is already signed with debug key, just rename for upload
+          cp app/build/outputs/apk/debug/app-debug.apk BLE-Anchor-v${{ github.event.release.tag_name }}.apk
+
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: BLE-Anchor-*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload APK as Artifact (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: BLE-Anchor-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
