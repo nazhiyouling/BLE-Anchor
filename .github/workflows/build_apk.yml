@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  APK_BASE_NAME: BLE-Anchor         # 可自定义基础名称，例如“蓝牙锚点”
+  APK_BASE_NAME: BLE-Anchor
 
 jobs:
   build:
@@ -41,14 +41,13 @@ jobs:
             echo "Generated placeholder icon"
           fi
 
-      # 👇 注入动态版本号到 build.gradle.kts 中的 versionName
+      # 注入版本号，兼容大写 V 前缀
       - name: Inject version from Release Tag
         run: |
           TAG="${{ github.event.release.tag_name }}"
-          # 去除可能的 'v' 前缀，得到纯数字版本号（如 v1.2.3 -> 1.2.3）
-          CLEAN_VERSION="${TAG#v}"
+          # 去掉前导的 v 或 V
+          CLEAN_VERSION="$(echo "$TAG" | sed 's/^[vV]//')"
           echo "Injecting versionName = $CLEAN_VERSION"
-          # 替换 build.gradle.kts 中的 versionName 行
           sed -i "s/versionName = \".*\"/versionName = \"$CLEAN_VERSION\"/" app/build.gradle.kts
 
       - name: Setup Gradle and generate wrapper
@@ -62,7 +61,7 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
-      # 重命名 APK，格式：基础名称-v版本号.apk（保留原始 Tag）
+      # 重命名 APK，文件名保留原始 Tag（含 V）
       - name: Rename APK with release version
         run: |
           TAG="${{ github.event.release.tag_name }}"
