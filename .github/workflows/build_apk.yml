@@ -41,6 +41,16 @@ jobs:
             echo "Generated placeholder icon"
           fi
 
+      # 👇 注入动态版本号到 build.gradle.kts 中的 versionName
+      - name: Inject version from Release Tag
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          # 去除可能的 'v' 前缀，得到纯数字版本号（如 v1.2.3 -> 1.2.3）
+          CLEAN_VERSION="${TAG#v}"
+          echo "Injecting versionName = $CLEAN_VERSION"
+          # 替换 build.gradle.kts 中的 versionName 行
+          sed -i "s/versionName = \".*\"/versionName = \"$CLEAN_VERSION\"/" app/build.gradle.kts
+
       - name: Setup Gradle and generate wrapper
         uses: gradle/actions/setup-gradle@v3
         with:
@@ -52,7 +62,7 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
-      # 重命名 APK，格式：基础名称-v版本号.apk
+      # 重命名 APK，格式：基础名称-v版本号.apk（保留原始 Tag）
       - name: Rename APK with release version
         run: |
           TAG="${{ github.event.release.tag_name }}"
@@ -60,7 +70,6 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk "${APK_NAME}"
           echo "APK_NAME=${APK_NAME}" >> $GITHUB_ENV
 
-      # 上传到 Release Assets
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -68,7 +77,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 备份 Artifact
       - name: Upload APK as Artifact (backup)
         uses: actions/upload-artifact@v4
         with:
