@@ -31,8 +31,16 @@ class BleAdvertiserService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            "START" -> startBleAdvertising()
-            "STOP" -> stopBleAdvertising()
+            "START" -> {
+                // 无论 BLE 广播是否成功，先启动前台服务（显示通知）
+                startForeground(NOTIFICATION_ID, buildNotification())
+                startBleAdvertising()
+            }
+            "STOP" -> {
+                stopBleAdvertising()
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
         }
         return START_STICKY
     }
@@ -44,70 +52,92 @@ class BleAdvertiserService : Service() {
 
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val bluetoothAdapter = bluetoothManager.adapter
+        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
+            // 蓝牙未开启，仍保持服务，但广播失败
+            updateNotification("蓝牙未开启")
+            return
+        }
+
         advertiser = bluetoothAdapter.bluetoothLeAdvertiser
+        if (advertiser == null) {
+            updateNotification("设备不支持BLE广播")
+            return
+        }
 
-        // 配置广播参数：低延迟、高发射功率、可连接
-        val settings = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
-            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
-            .setConnectable(true)       // 允许电脑端连接以读取 RSSI
-            .build()
+        try {
+            val settings = AdvertiseSettings.Builder()
+                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
+                .setConnectable(true)
+                .build()
 
-        // 广播数据：包含一个简单的服务 UUID（电脑端根据此 UUID 发现设备）
-        val serviceUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
-        val advertiseData = AdvertiseData.Builder()
-            .setIncludeDeviceName(true)         // 可选：让电脑显示手机名称
-            .addServiceUuid(serviceUuid)
-            .build()
+            val serviceUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
+            val advertiseData = AdvertiseData.Builder()
+                .setIncludeDeviceName(true)       // 广播设备名称，方便电脑识别
+                .addServiceUuid(serviceUuid)
+                .build()
 
-        advertiser?.startAdvertising(settings, advertiseData, advertiseCallback)
-        isAdvertising = true
-
-        // 启动前台服务，确保系统不杀死进程
-        startForeground(NOTIFICATION_ID, buildNotification())
+            advertiser?.startAdvertising(settings, advertiseData, advertiseCallback)
+            isAdvertising = true
+            updateNotification("BLE 锚点运行中")
+        } catch (e: Exception) {
+            Log.e(TAG, "启动广播异常", e)
+            updateNotification("广播启动失败")
+        }
     }
 
     private fun stopBleAdvertising() {
-        advertiser?.stopAdvertising(advertiseCallback)
+        try {
+            advertiser?.stopAdvertising(advertiseCallback)
+        } catch (e: Exception) {
+            Log.e(TAG, "停止广播异常", e)
+        }
         isAdvertising = false
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
     }
 
     private val advertiseCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
             Log.d(TAG, "BLE 广播启动成功")
+            updateNotification("BLE 锚点运行中")
         }
 
         override fun onStartFailure(errorCode: Int) {
             Log.e(TAG, "BLE 广播启动失败: $errorCode")
-            stopSelf()
+            updateNotification("广播失败，错误码: $errorCode")
+            // 即使失败也保持服务，用户可重试
         }
     }
 
-    // 创建通知渠道（必须前台服务）
+    // 更新通知文字（可多次调用）
+    private fun updateNotification(text: String) {
+        val notification = buildNotification(text)
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.notify(NOTIFICATION_ID, notification)
+    }
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 "BLE 锚点服务",
                 NotificationManager.IMPORTANCE_LOW
-            )
+            ).apply {
+                description = "用于保持蓝牙广播服务运行"
+            }
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
         }
     }
 
-    // 构建前台通知
-    private fun buildNotification(): Notification {
+    private fun buildNotification(contentText: String = "BLE 锚点运行中"): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("BLE 锚点运行中")
-            .setContentText("正在持续广播蓝牙信号")
-            .setSmallIcon(android.R.drawable.ic_menu_compass)
+            .setContentTitle("BLE 锚点")
+            .setContentText(contentText)
+            .setSmallIcon(android.R.drawable.ic_menu_compass) // 确保有小图标
             .setOngoing(true)
             .setContentIntent(pendingIntent)
             .build()
