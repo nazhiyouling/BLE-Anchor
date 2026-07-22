@@ -1,7 +1,6 @@
 package com.example.bleanchor
 
 import android.Manifest
-import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -9,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -23,9 +23,9 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         if (permissions.values.all { it }) {
-            startAdvertisingService()
+            startService()
         } else {
-            statusText.text = "缺少必要权限，无法启动广播"
+            Toast.makeText(this, "必须授予蓝牙权限才能广播", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
 
         toggleButton.setOnClickListener {
             if (isAdvertising) {
-                stopAdvertisingService()
+                stopService()
             } else {
                 checkPermissionsAndStart()
             }
@@ -54,30 +54,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkPermissionsAndStart() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADVERTISE)
-                == PackageManager.PERMISSION_GRANTED
-            ) {
-                startAdvertisingService()
-            } else {
-                requestPermissionLauncher.launch(
-                    arrayOf(Manifest.permission.BLUETOOTH_ADVERTISE)
-                )
-            }
+        val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT)
         } else {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH)
-                == PackageManager.PERMISSION_GRANTED
-            ) {
-                startAdvertisingService()
-            } else {
-                requestPermissionLauncher.launch(
-                    arrayOf(Manifest.permission.BLUETOOTH)
-                )
-            }
+            arrayOf(Manifest.permission.BLUETOOTH)
+        }
+
+        val allGranted = requiredPermissions.all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (allGranted) {
+            startService()
+        } else {
+            requestPermissionLauncher.launch(requiredPermissions)
         }
     }
 
-    private fun startAdvertisingService() {
+    private fun startService() {
         val intent = Intent(this, BleAdvertiserService::class.java).apply {
             action = "START"
         }
@@ -88,16 +81,16 @@ class MainActivity : AppCompatActivity() {
         }
         isAdvertising = true
         toggleButton.text = "停止广播"
-        statusText.text = "正在广播 BLE 信号..."
+        statusText.text = "正在广播..."
     }
 
-    private fun stopAdvertisingService() {
+    private fun stopService() {
         val intent = Intent(this, BleAdvertiserService::class.java).apply {
             action = "STOP"
         }
-        startService(intent)  // 发送 STOP 指令
+        startService(intent)
         isAdvertising = false
         toggleButton.text = "开始广播"
-        statusText.text = "广播已停止"
+        statusText.text = "已停止"
     }
 }
