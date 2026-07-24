@@ -25,6 +25,8 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         if (permissions.values.all { it }) {
+            // 权限授予后显示地址并启动服务
+            showBluetoothAddress()
             startService()
         } else {
             Toast.makeText(this, "必须授予蓝牙权限才能广播", Toast.LENGTH_LONG).show()
@@ -44,12 +46,16 @@ class MainActivity : AppCompatActivity() {
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
             statusText.text = "请先开启手机蓝牙"
             toggleButton.isEnabled = false
+            addressText.text = "本机蓝牙地址: 不可用"
             return
         }
 
-        // 显示本机蓝牙地址
-        val address = bluetoothAdapter.address
-        addressText.text = "本机蓝牙地址: $address"
+        // 如果已有权限，直接显示地址；否则等用户授权后再显示
+        if (hasRequiredPermissions()) {
+            showBluetoothAddress()
+        } else {
+            addressText.text = "本机蓝牙地址: 需授权后显示"
+        }
 
         toggleButton.setOnClickListener {
             if (isAdvertising) {
@@ -60,6 +66,38 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun showBluetoothAddress() {
+        try {
+            val bluetoothManager = getSystemService(BluetoothManager::class.java)
+            val adapter = bluetoothManager.adapter
+            if (adapter != null) {
+                // Android 12+ 需要 BLUETOOTH_CONNECT 权限才能读取地址
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                        addressText.text = "本机蓝牙地址: ${adapter.address}"
+                    } else {
+                        addressText.text = "本机蓝牙地址: 权限不足"
+                    }
+                } else {
+                    addressText.text = "本机蓝牙地址: ${adapter.address}"
+                }
+            }
+        } catch (e: SecurityException) {
+            addressText.text = "本机蓝牙地址: 权限被拒绝"
+        }
+    }
+
+    private fun hasRequiredPermissions(): Boolean {
+        val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            arrayOf(Manifest.permission.BLUETOOTH)
+        }
+        return requiredPermissions.all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
     private fun checkPermissionsAndStart() {
         val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             arrayOf(Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT)
@@ -67,10 +105,7 @@ class MainActivity : AppCompatActivity() {
             arrayOf(Manifest.permission.BLUETOOTH)
         }
 
-        val allGranted = requiredPermissions.all {
-            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
-        }
-        if (allGranted) {
+        if (hasRequiredPermissions()) {
             startService()
         } else {
             requestPermissionLauncher.launch(requiredPermissions)
