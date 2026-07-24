@@ -1,7 +1,6 @@
 package com.example.bleanchor
 
 import android.Manifest
-import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -19,13 +18,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var toggleButton: Button
     private lateinit var addressText: TextView
+    private lateinit var versionText: TextView        // 新增：版本号显示
     private var isAdvertising = false
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         if (permissions.values.all { it }) {
-            // 权限授予后显示地址并启动服务
             showBluetoothAddress()
             startService()
         } else {
@@ -40,6 +39,11 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.status_text)
         toggleButton = findViewById(R.id.toggle_button)
         addressText = findViewById(R.id.address_text)
+        versionText = findViewById(R.id.version_text)   // 绑定版本号控件
+
+        // 显示版本号（格式 V2026.07.24.1746）
+        val versionName = BuildConfig.VERSION_NAME
+        versionText.text = "V$versionName"
 
         val bluetoothManager = getSystemService(BluetoothManager::class.java)
         val bluetoothAdapter = bluetoothManager.adapter
@@ -50,7 +54,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // 如果已有权限，直接显示地址；否则等用户授权后再显示
         if (hasRequiredPermissions()) {
             showBluetoothAddress()
         } else {
@@ -71,15 +74,20 @@ class MainActivity : AppCompatActivity() {
             val bluetoothManager = getSystemService(BluetoothManager::class.java)
             val adapter = bluetoothManager.adapter
             if (adapter != null) {
-                // Android 12+ 需要 BLUETOOTH_CONNECT 权限才能读取地址
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                        addressText.text = "本机蓝牙地址: ${adapter.address}"
+                        val addr = adapter.address
+                        if (addr == "00:00:00:00:00:00" || addr == "02:00:00:00:00:00") {
+                            addressText.text = "无法自动获取蓝牙地址\n请前往 设置→关于手机→状态信息 查看"
+                        } else {
+                            addressText.text = "本机蓝牙地址: $addr"
+                        }
                     } else {
                         addressText.text = "本机蓝牙地址: 权限不足"
                     }
                 } else {
-                    addressText.text = "本机蓝牙地址: ${adapter.address}"
+                    val addr = adapter.address
+                    addressText.text = "本机蓝牙地址: $addr"
                 }
             }
         } catch (e: SecurityException) {
