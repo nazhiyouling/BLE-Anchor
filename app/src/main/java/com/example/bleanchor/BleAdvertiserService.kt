@@ -71,7 +71,7 @@ class BleAdvertiserService : Service() {
 
             val serviceUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
             val advertiseData = AdvertiseData.Builder()
-                .setIncludeDeviceName(true)   // 广播手机名称
+                .setIncludeDeviceName(false)   // 不广播名称，避免数据过大
                 .addServiceUuid(serviceUuid)
                 .build()
 
