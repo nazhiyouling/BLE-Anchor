@@ -66,12 +66,12 @@ class BleAdvertiserService : Service() {
             val settings = AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
-                .setConnectable(true)          // 必须可连接
+                .setConnectable(true)
                 .build()
 
             val serviceUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
             val advertiseData = AdvertiseData.Builder()
-                .setIncludeDeviceName(false)   // 不广播名称，避免数据过大
+                .setIncludeDeviceName(false)    // 避免数据过大
                 .addServiceUuid(serviceUuid)
                 .build()
 
