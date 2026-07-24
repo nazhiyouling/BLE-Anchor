@@ -9,10 +9,10 @@ android {
 
     defaultConfig {
         applicationId = "com.example.bleanchor"
-        minSdk = 26          // Android 8.0，支持 BLE 外围模式
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"   // 默认版本，构建时由 CI 替换
     }
 
     buildTypes {
