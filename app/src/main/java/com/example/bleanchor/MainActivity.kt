@@ -1,6 +1,7 @@
 package com.example.bleanchor
 
 import android.Manifest
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -17,6 +18,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var statusText: TextView
     private lateinit var toggleButton: Button
+    private lateinit var addressText: TextView
     private var isAdvertising = false
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -35,6 +37,7 @@ class MainActivity : AppCompatActivity() {
 
         statusText = findViewById(R.id.status_text)
         toggleButton = findViewById(R.id.toggle_button)
+        addressText = findViewById(R.id.address_text)
 
         val bluetoothManager = getSystemService(BluetoothManager::class.java)
         val bluetoothAdapter = bluetoothManager.adapter
@@ -43,6 +46,10 @@ class MainActivity : AppCompatActivity() {
             toggleButton.isEnabled = false
             return
         }
+
+        // 显示本机蓝牙地址
+        val address = bluetoothAdapter.address
+        addressText.text = "本机蓝牙地址: $address"
 
         toggleButton.setOnClickListener {
             if (isAdvertising) {
