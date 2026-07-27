@@ -63,28 +63,15 @@ class BleAdvertiserService : Service() {
         }
 
         try {
-            val settingsBuilder = AdvertiseSettings.Builder()
+            val settings = AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
-                .setConnectable(true)
+                .setConnectable(true)          // 必须可连接
+                .build()
 
-            // 强制使用公共地址广播（经典蓝牙地址）
-            val publicAddress = bluetoothAdapter.address
-            if (publicAddress != "00:00:00:00:00:00" && publicAddress != "02:00:00:00:00:00") {
-                try {
-                    settingsBuilder.setOwnAddressType(AdvertiseSettings.ADVERTISE_OWN_ADDRESS_PUBLIC)
-                    Log.d(TAG, "使用公共地址广播: $publicAddress")
-                } catch (e: Exception) {
-                    Log.e(TAG, "无法设置公共地址，使用随机地址", e)
-                }
-            } else {
-                Log.d(TAG, "公共地址无效，使用随机地址")
-            }
-
-            val settings = settingsBuilder.build()
             val serviceUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
             val advertiseData = AdvertiseData.Builder()
-                .setIncludeDeviceName(false)   // 避免数据过大
+                .setIncludeDeviceName(false)   // 不广播名称，避免数据过大
                 .addServiceUuid(serviceUuid)
                 .build()
 
