@@ -47,41 +47,49 @@ class BleAdvertiserService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun startBleAdvertising() {
-        if (isAdvertising) return
+    if (isAdvertising) return
 
-        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        val bluetoothAdapter = bluetoothManager.adapter
-        if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
-            updateNotification("❌ 蓝牙未开启")
-            return
-        }
-
-        advertiser = bluetoothAdapter.bluetoothLeAdvertiser
-        if (advertiser == null) {
-            updateNotification("❌ 设备不支持BLE广播")
-            return
-        }
-
-        try {
-            val settings = AdvertiseSettings.Builder()
-                .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
-                .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
-                .setConnectable(true)
-                .build()
-
-            val serviceUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
-            val advertiseData = AdvertiseData.Builder()
-                .setIncludeDeviceName(false)    // 避免数据过大
-                .addServiceUuid(serviceUuid)
-                .build()
-
-            advertiser?.startAdvertising(settings, advertiseData, advertiseCallback)
-            isAdvertising = true
-        } catch (e: Exception) {
-            Log.e(TAG, "启动广播异常", e)
-            updateNotification("❌ 广播启动异常")
-        }
+    val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+    val bluetoothAdapter = bluetoothManager.adapter
+    if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
+        updateNotification("❌ 蓝牙未开启")
+        return
     }
+
+    advertiser = bluetoothAdapter.bluetoothLeAdvertiser
+    if (advertiser == null) {
+        updateNotification("❌ 设备不支持BLE广播")
+        return
+    }
+
+    try {
+        val settingsBuilder = AdvertiseSettings.Builder()
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
+            .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
+            .setConnectable(true)
+
+        // 尝试使用公共地址（经典蓝牙地址），这样电脑端才能通过已知地址连接
+        if (bluetoothAdapter.address != "00:00:00:00:00:00" && bluetoothAdapter.address != "02:00:00:00:00:00") {
+            settingsBuilder.setOwnAddressType(AdvertiseSettings.ADVERTISE_OWN_ADDRESS_PUBLIC)
+            Log.d(TAG, "使用公共地址广播: ${bluetoothAdapter.address}")
+        } else {
+            Log.d(TAG, "公共地址无效，使用默认随机地址")
+        }
+
+        val settings = settingsBuilder.build()
+        val serviceUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
+        val advertiseData = AdvertiseData.Builder()
+            .setIncludeDeviceName(false)
+            .addServiceUuid(serviceUuid)
+            .build()
+
+        advertiser?.startAdvertising(settings, advertiseData, advertiseCallback)
+        isAdvertising = true
+    } catch (e: Exception) {
+        Log.e(TAG, "启动广播异常", e)
+        updateNotification("❌ 广播启动异常")
+    }
+}
 
     private fun stopBleAdvertising() {
         try {
