@@ -12,14 +12,14 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.example.bleanchor.BuildConfig  // 新增
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var statusText: TextView
     private lateinit var toggleButton: Button
     private lateinit var addressText: TextView
-    private lateinit var versionText: TextView        // 新增：版本号显示
+    private lateinit var broadcastAddressText: TextView   // 显示广播实际使用的地址
+    private lateinit var versionText: TextView
     private var isAdvertising = false
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -40,11 +40,10 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.status_text)
         toggleButton = findViewById(R.id.toggle_button)
         addressText = findViewById(R.id.address_text)
-        versionText = findViewById(R.id.version_text)   // 绑定版本号控件
+        broadcastAddressText = findViewById(R.id.broadcast_address_text)
+        versionText = findViewById(R.id.version_text)
 
-        // 显示版本号（格式 V2026.07.24.1746）
-        val versionName = BuildConfig.VERSION_NAME
-        versionText.text = "V$versionName"
+        versionText.text = "V${BuildConfig.VERSION_NAME}"
 
         val bluetoothManager = getSystemService(BluetoothManager::class.java)
         val bluetoothAdapter = bluetoothManager.adapter
@@ -52,6 +51,7 @@ class MainActivity : AppCompatActivity() {
             statusText.text = "请先开启手机蓝牙"
             toggleButton.isEnabled = false
             addressText.text = "本机蓝牙地址: 不可用"
+            broadcastAddressText.text = "广播地址: 不可用"
             return
         }
 
@@ -59,6 +59,7 @@ class MainActivity : AppCompatActivity() {
             showBluetoothAddress()
         } else {
             addressText.text = "本机蓝牙地址: 需授权后显示"
+            broadcastAddressText.text = "广播地址: 需授权后显示"
         }
 
         toggleButton.setOnClickListener {
@@ -79,20 +80,22 @@ class MainActivity : AppCompatActivity() {
                     if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
                         val addr = adapter.address
                         if (addr == "00:00:00:00:00:00" || addr == "02:00:00:00:00:00") {
-                            addressText.text = "无法自动获取蓝牙地址\n请前往 设置→关于手机→状态信息 查看"
+                            addressText.text = "系统地址: 无法获取"
+                            broadcastAddressText.text = "广播地址: 随机（由系统分配）"
                         } else {
-                            addressText.text = "本机蓝牙地址: $addr"
+                            addressText.text = "系统地址: $addr"
+                            broadcastAddressText.text = "广播地址: $addr (公共)"
                         }
-                    } else {
-                        addressText.text = "本机蓝牙地址: 权限不足"
                     }
                 } else {
                     val addr = adapter.address
-                    addressText.text = "本机蓝牙地址: $addr"
+                    addressText.text = "系统地址: $addr"
+                    broadcastAddressText.text = "广播地址: $addr (公共)"
                 }
             }
         } catch (e: SecurityException) {
-            addressText.text = "本机蓝牙地址: 权限被拒绝"
+            addressText.text = "权限不足"
+            broadcastAddressText.text = "权限不足"
         }
     }
 
