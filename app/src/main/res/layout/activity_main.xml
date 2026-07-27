@@ -29,12 +29,24 @@
         android:layout_marginTop="16dp"/>
 
     <TextView
+        android:id="@+id/broadcast_address_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="广播地址: --"
+        android:textSize="14sp"
+        android:textColor="#FF6600"
+        app:layout_constraintTop_toBottomOf="@id/address_text"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp"/>
+
+    <TextView
         android:id="@+id/version_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="V1.0.0"
         android:textSize="12sp"
-        app:layout_constraintTop_toBottomOf="@id/address_text"
+        app:layout_constraintTop_toBottomOf="@id/broadcast_address_text"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="8dp"/>
