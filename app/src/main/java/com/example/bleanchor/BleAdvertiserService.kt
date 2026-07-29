@@ -45,6 +45,10 @@ class BleAdvertiserService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    /**
+     * 内部版本: A2026.07.29.1727-Android
+     * 使用扫描响应添加固定名称 "BLE-Anchor"，便于电脑端识别
+     */
     private fun startBleAdvertising() {
         if (isAdvertising) return
 
@@ -65,16 +69,23 @@ class BleAdvertiserService : Service() {
             val settings = AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
-                .setConnectable(true)          // 必须可连接
+                .setConnectable(true)
                 .build()
 
+            // 主广播包：只放 UUID，节省空间
             val serviceUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
             val advertiseData = AdvertiseData.Builder()
-                .setIncludeDeviceName(false)   // 不广播名称，避免数据过大
+                .setIncludeDeviceName(false)
                 .addServiceUuid(serviceUuid)
                 .build()
 
-            advertiser?.startAdvertising(settings, advertiseData, advertiseCallback)
+            // 扫描响应包：放一个固定短名称，方便识别
+            val scanResponseData = AdvertiseData.Builder()
+                .setIncludeDeviceName(false)
+                .setShortName("BLE-Anchor")   // 短名称，占用极少字节
+                .build()
+
+            advertiser?.startAdvertising(settings, advertiseData, scanResponseCallback)
             isAdvertising = true
         } catch (e: Exception) {
             Log.e(TAG, "启动广播异常", e)
@@ -108,6 +119,17 @@ class BleAdvertiserService : Service() {
                 else -> "未知错误($errorCode)"
             }
             updateNotification("❌ 广播失败: $msg")
+        }
+    }
+
+    // 扫描响应的回调（如果设置失败不影响主广播）
+    private val scanResponseCallback = object : AdvertiseCallback() {
+        override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
+            Log.d(TAG, "扫描响应设置成功")
+        }
+
+        override fun onStartFailure(errorCode: Int) {
+            Log.e(TAG, "扫描响应设置失败: $errorCode")
         }
     }
 
