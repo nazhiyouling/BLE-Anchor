@@ -52,12 +52,20 @@ class BleAdvertiserService : Service() {
         advertiser = adapter.bluetoothLeAdvertiser ?: run { updateNotification("❌ 不支持BLE"); return }
 
         try {
-            val settings = AdvertiseSettings.Builder()
+            val settingsBuilder = AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
                 .setConnectable(true)
-                .build()
 
+            // Android 12+ 强制使用公共地址，确保地址固定不变
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                settingsBuilder.setOwnAddressType(AdvertiseSettings.ADVERTISE_OWN_ADDRESS_PUBLIC)
+                Log.d(TAG, "使用公共地址广播")
+            } else {
+                Log.d(TAG, "使用默认随机地址广播")
+            }
+
+            val settings = settingsBuilder.build()
             val uuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
             val data = AdvertiseData.Builder()
                 .setIncludeDeviceName(false)
