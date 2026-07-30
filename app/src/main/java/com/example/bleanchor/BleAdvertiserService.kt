@@ -1,5 +1,6 @@
 package com.example.bleanchor
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -45,6 +46,7 @@ class BleAdvertiserService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    @SuppressLint("NewApi")
     private fun startBleAdvertising() {
         if (isAdvertising) return
         val btManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -57,7 +59,7 @@ class BleAdvertiserService : Service() {
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
                 .setConnectable(true)
 
-            // Android 12+ 强制使用公共地址，确保地址固定不变
+            // Android 12+ 使用公共地址，保持地址固定
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 settingsBuilder.setOwnAddressType(AdvertiseSettings.ADVERTISE_OWN_ADDRESS_PUBLIC)
                 Log.d(TAG, "使用公共地址广播")
