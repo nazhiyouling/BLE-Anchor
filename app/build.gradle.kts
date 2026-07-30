@@ -9,13 +9,12 @@ android {
 
     defaultConfig {
         applicationId = "com.example.bleanchor"
-        minSdk = 26
+        minSdk = 26          // Android 8.0
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0.0"   // 默认版本，CI 会动态替换
+        versionName = "1.0.0"   // 构建时由 CI 替换
     }
 
-    // 👇 必须添加，否则 BuildConfig 不会生成
     buildFeatures {
         buildConfig = true
     }
