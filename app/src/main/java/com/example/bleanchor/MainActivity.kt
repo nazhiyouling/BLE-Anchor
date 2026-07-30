@@ -18,7 +18,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var toggleButton: Button
     private lateinit var addressText: TextView
-    private lateinit var broadcastAddressText: TextView   // 显示广播实际使用的地址
     private lateinit var versionText: TextView
     private var isAdvertising = false
 
@@ -40,7 +39,6 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.status_text)
         toggleButton = findViewById(R.id.toggle_button)
         addressText = findViewById(R.id.address_text)
-        broadcastAddressText = findViewById(R.id.broadcast_address_text)
         versionText = findViewById(R.id.version_text)
 
         versionText.text = "V${BuildConfig.VERSION_NAME}"
@@ -50,16 +48,14 @@ class MainActivity : AppCompatActivity() {
         if (bluetoothAdapter == null || !bluetoothAdapter.isEnabled) {
             statusText.text = "请先开启手机蓝牙"
             toggleButton.isEnabled = false
-            addressText.text = "本机蓝牙地址: 不可用"
-            broadcastAddressText.text = "广播地址: 不可用"
+            addressText.text = "蓝牙地址: 不可用"
             return
         }
 
         if (hasRequiredPermissions()) {
             showBluetoothAddress()
         } else {
-            addressText.text = "本机蓝牙地址: 需授权后显示"
-            broadcastAddressText.text = "广播地址: 需授权后显示"
+            addressText.text = "蓝牙地址: 需授权后显示"
         }
 
         toggleButton.setOnClickListener {
@@ -73,75 +69,55 @@ class MainActivity : AppCompatActivity() {
 
     private fun showBluetoothAddress() {
         try {
-            val bluetoothManager = getSystemService(BluetoothManager::class.java)
-            val adapter = bluetoothManager.adapter
+            val adapter = (getSystemService(BluetoothManager::class.java)).adapter
             if (adapter != null) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                        val addr = adapter.address
-                        if (addr == "00:00:00:00:00:00" || addr == "02:00:00:00:00:00") {
-                            addressText.text = "系统地址: 无法获取"
-                            broadcastAddressText.text = "广播地址: 随机（由系统分配）"
-                        } else {
-                            addressText.text = "系统地址: $addr"
-                            broadcastAddressText.text = "广播地址: $addr (公共)"
-                        }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                    val addr = adapter.address
+                    if (addr == "00:00:00:00:00:00" || addr == "02:00:00:00:00:00") {
+                        addressText.text = "蓝牙地址: 无法获取（系统限制）\n请查看手机设置-关于本机"
+                    } else {
+                        addressText.text = "蓝牙地址: $addr"
                     }
                 } else {
-                    val addr = adapter.address
-                    addressText.text = "系统地址: $addr"
-                    broadcastAddressText.text = "广播地址: $addr (公共)"
+                    addressText.text = "蓝牙地址: ${adapter.address}"
                 }
             }
         } catch (e: SecurityException) {
-            addressText.text = "权限不足"
-            broadcastAddressText.text = "权限不足"
+            addressText.text = "蓝牙地址: 权限不足"
         }
     }
 
     private fun hasRequiredPermissions(): Boolean {
-        val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             arrayOf(Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT)
         } else {
             arrayOf(Manifest.permission.BLUETOOTH)
         }
-        return requiredPermissions.all {
-            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
-        }
+        return permissions.all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
     }
 
     private fun checkPermissionsAndStart() {
-        val requiredPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             arrayOf(Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT)
         } else {
             arrayOf(Manifest.permission.BLUETOOTH)
         }
-
-        if (hasRequiredPermissions()) {
-            startService()
-        } else {
-            requestPermissionLauncher.launch(requiredPermissions)
-        }
+        if (hasRequiredPermissions()) startService()
+        else requestPermissionLauncher.launch(permissions)
     }
 
     private fun startService() {
-        val intent = Intent(this, BleAdvertiserService::class.java).apply {
-            action = "START"
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
+        val intent = Intent(this, BleAdvertiserService::class.java).apply { action = "START" }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent)
+        else startService(intent)
         isAdvertising = true
         toggleButton.text = "停止广播"
-        statusText.text = "正在广播..."
+        statusText.text = "广播中..."
     }
 
     private fun stopService() {
-        val intent = Intent(this, BleAdvertiserService::class.java).apply {
-            action = "STOP"
-        }
+        val intent = Intent(this, BleAdvertiserService::class.java).apply { action = "STOP" }
         startService(intent)
         isAdvertising = false
         toggleButton.text = "开始广播"
