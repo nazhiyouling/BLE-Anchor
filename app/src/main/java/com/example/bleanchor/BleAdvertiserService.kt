@@ -16,6 +16,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.os.ParcelUuid
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 
@@ -23,10 +24,12 @@ class BleAdvertiserService : Service() {
 
     private var advertiser: BluetoothLeAdvertiser? = null
     private var isAdvertising = false
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        acquireWakeLock()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -46,7 +49,6 @@ class BleAdvertiserService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    @SuppressLint("NewApi")
     private fun startBleAdvertising() {
         if (isAdvertising) return
         val btManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -59,12 +61,18 @@ class BleAdvertiserService : Service() {
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
                 .setConnectable(true)
 
-            // Android 12+ 使用公共地址，保持地址固定
+            // 通过反射设置公共地址，避免编译时错误
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                settingsBuilder.setOwnAddressType(AdvertiseSettings.ADVERTISE_OWN_ADDRESS_PUBLIC)
-                Log.d(TAG, "使用公共地址广播")
-            } else {
-                Log.d(TAG, "使用默认随机地址广播")
+                try {
+                    val setOwnAddressTypeMethod = AdvertiseSettings.Builder::class.java
+                        .getMethod("setOwnAddressType", Int::class.javaPrimitiveType)
+                    val advertiseOwnAddressPublic = AdvertiseSettings::class.java
+                        .getDeclaredField("ADVERTISE_OWN_ADDRESS_PUBLIC").getInt(null)
+                    setOwnAddressTypeMethod.invoke(settingsBuilder, advertiseOwnAddressPublic)
+                    Log.d(TAG, "使用公共地址广播")
+                } catch (e: Exception) {
+                    Log.e(TAG, "反射设置公共地址失败", e)
+                }
             }
 
             val settings = settingsBuilder.build()
@@ -91,6 +99,12 @@ class BleAdvertiserService : Service() {
     private fun stopBleAdvertising() {
         advertiser?.stopAdvertising(object : AdvertiseCallback() {})
         isAdvertising = false
+    }
+
+    private fun acquireWakeLock() {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BLE-Anchor::WakeLock")
+        wakeLock?.acquire(10 * 60 * 1000L) // 10分钟，可续期
     }
 
     private fun updateNotification(text: String) {
@@ -120,6 +134,7 @@ class BleAdvertiserService : Service() {
 
     override fun onDestroy() {
         stopBleAdvertising()
+        wakeLock?.let { if (it.isHeld) it.release() }
         super.onDestroy()
     }
 
