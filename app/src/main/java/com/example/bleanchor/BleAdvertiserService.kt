@@ -6,10 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.bluetooth.BluetoothManager
-import android.bluetooth.le.AdvertiseCallback
-import android.bluetooth.le.AdvertiseData
-import android.bluetooth.le.AdvertiseSettings
-import android.bluetooth.le.BluetoothLeAdvertiser
+import android.bluetooth.le.*
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -20,6 +17,7 @@ import android.os.ParcelUuid
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import java.util.*
 
 class BleAdvertiserService : Service() {
 
@@ -27,12 +25,14 @@ class BleAdvertiserService : Service() {
     private var isAdvertising = false
     private var wakeLock: PowerManager.WakeLock? = null
     private var screenOffReceiver: BroadcastReceiver? = null
+    private lateinit var deviceGuid: UUID
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
         acquireWakeLock()
         registerScreenOffReceiver()
+        deviceGuid = DeviceIdManager.getDeviceGuid(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -64,7 +64,6 @@ class BleAdvertiserService : Service() {
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
                 .setConnectable(true)
 
-            // 反射设置公共地址（Android 12+）
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 try {
                     val method = AdvertiseSettings.Builder::class.java.getMethod(
@@ -81,13 +80,21 @@ class BleAdvertiserService : Service() {
             }
 
             val settings = settingsBuilder.build()
-            val uuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
-            val data = AdvertiseData.Builder()
+
+            // 主广播包：服务 UUID
+            val serviceUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
+            val advertiseData = AdvertiseData.Builder()
                 .setIncludeDeviceName(false)
-                .addServiceUuid(uuid)
+                .addServiceUuid(serviceUuid)
                 .build()
 
-            advertiser?.startAdvertising(settings, data, object : AdvertiseCallback() {
+            // 扫描响应包：包含固定设备 GUID
+            val deviceGuidParcel = ParcelUuid(deviceGuid)
+            val scanResponseData = AdvertiseData.Builder()
+                .addServiceUuid(deviceGuidParcel)   // 将设备 GUID 作为服务 UUID 放入扫描响应
+                .build()
+
+            advertiser?.startAdvertising(settings, advertiseData, scanResponseData, object : AdvertiseCallback() {
                 override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
                     updateNotification("✅ BLE锚点运行中")
                 }
@@ -108,7 +115,6 @@ class BleAdvertiserService : Service() {
         isAdvertising = false
     }
 
-    // 屏幕关闭时重新启动广播，防止系统暂停
     private fun registerScreenOffReceiver() {
         screenOffReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -124,9 +130,7 @@ class BleAdvertiserService : Service() {
 
     private fun acquireWakeLock() {
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = pm.newWakeLock(
-            PowerManager.PARTIAL_WAKE_LOCK, "BLE-Anchor::WakeLock"
-        )
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BLE-Anchor::WakeLock")
         wakeLock?.acquire(10 * 60 * 1000L)
     }
 
@@ -137,22 +141,18 @@ class BleAdvertiserService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID, "BLE锚点", NotificationManager.IMPORTANCE_LOW
-            )
+            val channel = NotificationChannel(CHANNEL_ID, "BLE锚点", NotificationManager.IMPORTANCE_LOW)
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
 
     private fun buildNotification(text: String): Notification {
-        val pi = PendingIntent.getActivity(
-            this, 0, Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val pi = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("BLE锚点")
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_menu_compass) // 您可改为您的图标
+            .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(pi)
