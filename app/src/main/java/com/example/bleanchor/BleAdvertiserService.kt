@@ -6,6 +6,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.AdvertiseCallback
+import android.bluetooth.le.AdvertiseData
+import android.bluetooth.le.AdvertiseSettings
+import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -104,7 +108,7 @@ class BleAdvertiserService : Service() {
         isAdvertising = false
     }
 
-    // ----- 屏幕关闭时重新启动广播，防止系统暂停 -----
+    // 屏幕关闭时重新启动广播，防止系统暂停
     private fun registerScreenOffReceiver() {
         screenOffReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -123,7 +127,7 @@ class BleAdvertiserService : Service() {
         wakeLock = pm.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK, "BLE-Anchor::WakeLock"
         )
-        wakeLock?.acquire(10 * 60 * 1000L) // 10分钟，每次启动续期
+        wakeLock?.acquire(10 * 60 * 1000L)
     }
 
     private fun updateNotification(text: String) {
@@ -148,7 +152,7 @@ class BleAdvertiserService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("BLE锚点")
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_menu_compass) // 注意：这里仍用系统图标
+            .setSmallIcon(android.R.drawable.ic_menu_compass) // 您可改为您的图标
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(pi)
