@@ -74,26 +74,43 @@ class BleAdvertiserService : Service() {
         }
 
         try {
-            val settings = AdvertiseSettings.Builder()
+            val settingsBuilder = AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
                 .setConnectable(true)
-                .build()
 
+            // 尝试设置公共地址（Android 12+）
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                try {
+                    val method = AdvertiseSettings.Builder::class.java.getMethod(
+                        "setOwnAddressType", Int::class.javaPrimitiveType
+                    )
+                    val publicAddressValue = AdvertiseSettings::class.java
+                        .getDeclaredField("ADVERTISE_OWN_ADDRESS_PUBLIC").getInt(null)
+                    method.invoke(settingsBuilder, publicAddressValue)
+                    Log.d(TAG, "已启用公共地址广播")
+                } catch (e: Exception) {
+                    Log.e(TAG, "无法设置公共地址，将使用随机地址", e)
+                }
+            } else {
+                Log.d(TAG, "Android <12，使用默认地址")
+            }
+
+            val settings = settingsBuilder.build()
             val serviceUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
             val advertiseData = AdvertiseData.Builder()
                 .setIncludeDeviceName(false)
                 .addServiceUuid(serviceUuid)
                 .build()
 
-            // 扫描响应：携带固定设备GUID
+            // 扫描响应：携带设备固定 GUID
             val deviceGuidParcel = ParcelUuid(deviceGuid)
-            val scanResponseData = AdvertiseData.Builder()
+            val scanResponse = AdvertiseData.Builder()
                 .addServiceUuid(deviceGuidParcel)
                 .build()
 
             Log.d(TAG, "开始广播，设备GUID: $deviceGuid")
-            advertiser?.startAdvertising(settings, advertiseData, scanResponseData, object : AdvertiseCallback() {
+            advertiser?.startAdvertising(settings, advertiseData, scanResponse, object : AdvertiseCallback() {
                 override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
                     Log.d(TAG, "广播启动成功，模式: ${settingsInEffect.mode}")
                     updateNotification("✅ BLE锚点运行中")
@@ -166,7 +183,7 @@ class BleAdvertiserService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("BLE锚点")
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_menu_compass)   // 您可替换为自己的图标
+            .setSmallIcon(android.R.drawable.ic_menu_compass) // 您可替换为自己的图标
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(pi)
