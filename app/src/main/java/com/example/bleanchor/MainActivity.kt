@@ -18,6 +18,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var toggleButton: Button
     private lateinit var addressText: TextView
+    private lateinit var systemNameText: TextView   // 新增：显示系统蓝牙名称
     private lateinit var versionText: TextView
     private var isAdvertising = false
 
@@ -25,7 +26,7 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         if (permissions.values.all { it }) {
-            showBluetoothAddress()
+            showBluetoothInfo()
             startService()
         } else {
             Toast.makeText(this, "必须授予蓝牙权限才能广播", Toast.LENGTH_LONG).show()
@@ -39,6 +40,7 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.status_text)
         toggleButton = findViewById(R.id.toggle_button)
         addressText = findViewById(R.id.address_text)
+        systemNameText = findViewById(R.id.system_name_text)
         versionText = findViewById(R.id.version_text)
 
         versionText.text = "V${BuildConfig.VERSION_NAME}"
@@ -49,13 +51,15 @@ class MainActivity : AppCompatActivity() {
             statusText.text = "请先开启手机蓝牙"
             toggleButton.isEnabled = false
             addressText.text = "蓝牙地址: 不可用"
+            systemNameText.text = "系统蓝牙名称: 不可用"
             return
         }
 
         if (hasRequiredPermissions()) {
-            showBluetoothAddress()
+            showBluetoothInfo()
         } else {
             addressText.text = "蓝牙地址: 需授权后显示"
+            systemNameText.text = "系统蓝牙名称: 需授权后显示"
         }
 
         toggleButton.setOnClickListener {
@@ -67,15 +71,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showBluetoothAddress() {
+    private fun showBluetoothInfo() {
         try {
-            val adapter = (getSystemService(BluetoothManager::class.java)).adapter
+            val adapter = getSystemService(BluetoothManager::class.java).adapter
             if (adapter != null) {
+                // 显示系统蓝牙名称
+                val name = adapter.name
+                systemNameText.text = if (name.isNullOrEmpty()) {
+                    "系统蓝牙名称: 无法获取\n请前往 设置 → 蓝牙 中查看/修改"
+                } else {
+                    "系统蓝牙名称: $name\n(PC端设置中填写此名称即可精确匹配)"
+                }
+
+                // 显示地址
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                     ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
                     val addr = adapter.address
                     if (addr == "00:00:00:00:00:00" || addr == "02:00:00:00:00:00") {
-                        addressText.text = "蓝牙地址: 无法获取（系统限制）\n请查看手机设置-关于本机"
+                        addressText.text = "蓝牙地址: 无法获取（系统限制）"
                     } else {
                         addressText.text = "蓝牙地址: $addr"
                     }
@@ -85,6 +98,7 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (e: SecurityException) {
             addressText.text = "蓝牙地址: 权限不足"
+            systemNameText.text = "系统蓝牙名称: 权限不足"
         }
     }
 
