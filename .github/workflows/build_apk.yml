@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  APK_BASE_NAME: BLE-Anchor
+  APK_BASE_NAME: Ghost-BLE-Anchor
 
 jobs:
   build:
@@ -24,12 +24,17 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      # 升级到 v4，并显式只安装 platform-tools，避免请求已下架的 tools 包
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
 
+      # 清理非法图标资源（.ico 在 Android 资源目录中会构建失败）
       - name: Clean up invalid resource files (remove .ico)
         run: find app/src/main/res -name "*.ico" -type f -delete
 
+      # 准备启动图标：优先使用仓库根目录的 app.png，否则生成占位图
       - name: Prepare launcher icon
         run: |
           mkdir -p app/src/main/res/mipmap-hdpi
@@ -41,11 +46,10 @@ jobs:
             echo "Generated placeholder icon"
           fi
 
-      # 注入版本号，兼容大写 V 前缀
+      # 注入 Release Tag 版本号到 versionName
       - name: Inject version from Release Tag
         run: |
           TAG="${{ github.event.release.tag_name }}"
-          # 去掉前导的 v 或 V
           CLEAN_VERSION="$(echo "$TAG" | sed 's/^[vV]//')"
           echo "Injecting versionName = $CLEAN_VERSION"
           sed -i "s/versionName = \".*\"/versionName = \"$CLEAN_VERSION\"/" app/build.gradle.kts
@@ -61,7 +65,7 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
-      # 重命名 APK，文件名保留原始 Tag（含 V）
+      # 重命名 APK，格式：基础名称-v版本号.apk
       - name: Rename APK with release version
         run: |
           TAG="${{ github.event.release.tag_name }}"
@@ -79,5 +83,5 @@ jobs:
       - name: Upload APK as Artifact (backup)
         uses: actions/upload-artifact@v4
         with:
-          name: BLE-Anchor-APK
+          name: Ghost-BLE-Anchor-APK
           path: app/build/outputs/apk/debug/app-debug.apk
