@@ -6,7 +6,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.bluetooth.BluetoothManager
-import android.bluetooth.le.*
+import android.bluetooth.le.AdvertiseCallback
+import android.bluetooth.le.AdvertiseData
+import android.bluetooth.le.AdvertiseSettings
+import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -54,11 +57,36 @@ class BleAdvertiserService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    /**
+     * 设置固定的蓝牙名称，电脑端会校验该名称
+     */
+    private fun setBluetoothName(): Boolean {
+        return try {
+            val btManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+            val adapter = btManager.adapter ?: return false
+            val result = adapter.setName(DEVICE_NAME)
+            Log.d(TAG, "设置蓝牙名称 '$DEVICE_NAME' 结果: $result")
+            result
+        } catch (e: SecurityException) {
+            Log.e(TAG, "修改蓝牙名称需要 BLUETOOTH_CONNECT 权限", e)
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "修改蓝牙名称异常", e)
+            false
+        }
+    }
+
     private fun startBleAdvertising() {
         if (isAdvertising) {
             Log.w(TAG, "已在广播中，忽略重复请求")
             return
         }
+
+        if (!setBluetoothName()) {
+            Log.w(TAG, "蓝牙名称设置失败，电脑端将无法通过名称校验")
+            updateNotification("❌ 无法设置设备名称，请检查蓝牙权限")
+        }
+
         val btManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         val adapter = btManager.adapter
         if (adapter == null || !adapter.isEnabled) {
@@ -82,22 +110,23 @@ class BleAdvertiserService : Service() {
 
             val serviceUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
             val advertiseData = AdvertiseData.Builder()
-                .setIncludeDeviceName(false)
+                .setIncludeDeviceName(false)   // 保持关闭，避免广播数据过大
                 .addServiceUuid(serviceUuid)
                 .build()
 
-            // 扫描响应包：携带设备固定 GUID
+            // 扫描响应包：携带固定设备 GUID
             val deviceGuidParcel = ParcelUuid(deviceGuid)
             val scanResponse = AdvertiseData.Builder()
                 .addServiceUuid(deviceGuidParcel)
                 .build()
 
-            Log.d(TAG, "开始广播，设备GUID: $deviceGuid")
+            Log.d(TAG, "开始广播，设备GUID: $deviceGuid，名称: $DEVICE_NAME")
             advertiser?.startAdvertising(settings, advertiseData, scanResponse, object : AdvertiseCallback() {
                 override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
                     Log.d(TAG, "广播启动成功，模式: ${settingsInEffect.mode}")
-                    updateNotification("✅ BLE锚点运行中")
+                    updateNotification("✅ BLE锚点运行中 ($DEVICE_NAME)")
                 }
+
                 override fun onStartFailure(errorCode: Int) {
                     Log.e(TAG, "广播启动失败，错误码: $errorCode")
                     updateNotification("❌ 广播失败: $errorCode")
@@ -155,18 +184,24 @@ class BleAdvertiserService : Service() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(CHANNEL_ID, "BLE锚点", NotificationManager.IMPORTANCE_LOW)
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "BLE锚点",
+                NotificationManager.IMPORTANCE_LOW
+            )
             getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
 
     private fun buildNotification(text: String): Notification {
-        val pi = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val pi = PendingIntent.getActivity(
+            this, 0, Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("BLE锚点")
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_menu_compass) // 您可以替换为自己的图标
+            .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(pi)
@@ -185,5 +220,8 @@ class BleAdvertiserService : Service() {
         private const val TAG = "BleService"
         private const val CHANNEL_ID = "ble_anchor"
         private const val NOTIFICATION_ID = 1
+
+        // 电脑端必须与此名称完全一致
+        const val DEVICE_NAME = "Ghost-BLE-Anchor"
     }
 }
