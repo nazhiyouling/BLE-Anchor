@@ -30,6 +30,9 @@ class BleAdvertiserService : Service() {
     private var screenOffReceiver: BroadcastReceiver? = null
     private lateinit var deviceGuid: UUID
 
+    private val PREFS_NAME = "ble_anchor_prefs"
+    private val KEY_CUSTOM_NAME = "custom_bt_name"
+
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "服务创建")
@@ -44,6 +47,7 @@ class BleAdvertiserService : Service() {
         when (intent?.action) {
             "START" -> {
                 startForeground(NOTIFICATION_ID, buildNotification("正在启动..."))
+                ensureBluetoothName()
                 startBleAdvertising()
             }
             "STOP" -> {
@@ -58,21 +62,25 @@ class BleAdvertiserService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     /**
-     * 设置固定的蓝牙名称，电脑端会校验该名称
+     * 确保蓝牙名称与用户设置一致（如果 SharedPreferences 中有记录）
      */
-    private fun setBluetoothName(): Boolean {
-        return try {
+    private fun ensureBluetoothName() {
+        try {
+            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            val savedName = prefs.getString(KEY_CUSTOM_NAME, null) ?: return
+            if (savedName.isBlank()) return
+
             val btManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-            val adapter = btManager.adapter ?: return false
-            val result = adapter.setName(DEVICE_NAME)
-            Log.d(TAG, "设置蓝牙名称 '$DEVICE_NAME' 结果: $result")
-            result
+            val adapter = btManager.adapter ?: return
+            val current = adapter.name
+            if (current != savedName) {
+                val ok = adapter.setName(savedName)
+                Log.d(TAG, "恢复蓝牙名称 '$savedName' 结果: $ok")
+            }
         } catch (e: SecurityException) {
-            Log.e(TAG, "修改蓝牙名称需要 BLUETOOTH_CONNECT 权限", e)
-            false
+            Log.e(TAG, "恢复蓝牙名称权限不足", e)
         } catch (e: Exception) {
-            Log.e(TAG, "修改蓝牙名称异常", e)
-            false
+            Log.e(TAG, "恢复蓝牙名称异常", e)
         }
     }
 
@@ -80,11 +88,6 @@ class BleAdvertiserService : Service() {
         if (isAdvertising) {
             Log.w(TAG, "已在广播中，忽略重复请求")
             return
-        }
-
-        if (!setBluetoothName()) {
-            Log.w(TAG, "蓝牙名称设置失败，电脑端将无法通过名称校验")
-            updateNotification("❌ 无法设置设备名称，请检查蓝牙权限")
         }
 
         val btManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -110,7 +113,7 @@ class BleAdvertiserService : Service() {
 
             val serviceUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
             val advertiseData = AdvertiseData.Builder()
-                .setIncludeDeviceName(false)   // 保持关闭，避免广播数据过大
+                .setIncludeDeviceName(false)   // 名称通过 GATT 读取，不占用广播包
                 .addServiceUuid(serviceUuid)
                 .build()
 
@@ -120,11 +123,11 @@ class BleAdvertiserService : Service() {
                 .addServiceUuid(deviceGuidParcel)
                 .build()
 
-            Log.d(TAG, "开始广播，设备GUID: $deviceGuid，名称: $DEVICE_NAME")
+            Log.d(TAG, "开始广播，设备GUID: $deviceGuid")
             advertiser?.startAdvertising(settings, advertiseData, scanResponse, object : AdvertiseCallback() {
                 override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
                     Log.d(TAG, "广播启动成功，模式: ${settingsInEffect.mode}")
-                    updateNotification("✅ BLE锚点运行中 ($DEVICE_NAME)")
+                    updateNotification("✅ BLE锚点运行中")
                 }
 
                 override fun onStartFailure(errorCode: Int) {
@@ -220,8 +223,5 @@ class BleAdvertiserService : Service() {
         private const val TAG = "BleService"
         private const val CHANNEL_ID = "ble_anchor"
         private const val NOTIFICATION_ID = 1
-
-        // 电脑端必须与此名称完全一致
-        const val DEVICE_NAME = "Ghost-BLE-Anchor"
     }
 }
