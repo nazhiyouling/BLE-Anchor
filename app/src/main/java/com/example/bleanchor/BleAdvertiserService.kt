@@ -61,9 +61,6 @@ class BleAdvertiserService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    /**
-     * 确保蓝牙名称与用户设置一致（如果 SharedPreferences 中有记录）
-     */
     private fun ensureBluetoothName() {
         try {
             val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -72,8 +69,7 @@ class BleAdvertiserService : Service() {
 
             val btManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
             val adapter = btManager.adapter ?: return
-            val current = adapter.name
-            if (current != savedName) {
+            if (adapter.name != savedName) {
                 val ok = adapter.setName(savedName)
                 Log.d(TAG, "恢复蓝牙名称 '$savedName' 结果: $ok")
             }
@@ -111,19 +107,19 @@ class BleAdvertiserService : Service() {
                 .setConnectable(true)
                 .build()
 
+            // 主广播包：只放服务 UUID，节省空间
             val serviceUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
             val advertiseData = AdvertiseData.Builder()
-                .setIncludeDeviceName(false)   // 名称通过 GATT 读取，不占用广播包
+                .setIncludeDeviceName(false)
                 .addServiceUuid(serviceUuid)
                 .build()
 
-            // 扫描响应包：携带固定设备 GUID
-            val deviceGuidParcel = ParcelUuid(deviceGuid)
+            // 扫描响应：携带设备名称（不占用主广播包，避免数据过大）
             val scanResponse = AdvertiseData.Builder()
-                .addServiceUuid(deviceGuidParcel)
+                .setIncludeDeviceName(true)   // 扫描响应中附带当前蓝牙名称
                 .build()
 
-            Log.d(TAG, "开始广播，设备GUID: $deviceGuid")
+            Log.d(TAG, "开始广播，设备GUID: $deviceGuid，名称将通过扫描响应发送")
             advertiser?.startAdvertising(settings, advertiseData, scanResponse, object : AdvertiseCallback() {
                 override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
                     Log.d(TAG, "广播启动成功，模式: ${settingsInEffect.mode}")
