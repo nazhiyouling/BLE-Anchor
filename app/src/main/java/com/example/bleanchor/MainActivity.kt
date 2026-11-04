@@ -19,7 +19,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var toggleButton: Button
     private lateinit var addressText: TextView
     private lateinit var nameText: TextView
+    private lateinit var hintText: TextView
     private lateinit var versionText: TextView
+    private lateinit var refreshNameButton: Button
     private var isAdvertising = false
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -41,7 +43,9 @@ class MainActivity : AppCompatActivity() {
         toggleButton = findViewById(R.id.toggle_button)
         addressText = findViewById(R.id.address_text)
         nameText = findViewById(R.id.name_text)
+        hintText = findViewById(R.id.hint_text)
         versionText = findViewById(R.id.version_text)
+        refreshNameButton = findViewById(R.id.refresh_name_button)
 
         versionText.text = "V${BuildConfig.VERSION_NAME}"
 
@@ -62,6 +66,11 @@ class MainActivity : AppCompatActivity() {
             nameText.text = "蓝牙名称: 需授权后显示"
         }
 
+        refreshNameButton.setOnClickListener {
+            showBluetoothInfo()
+            Toast.makeText(this, "已刷新名称。如仍为旧名称，请关闭再打开蓝牙。", Toast.LENGTH_SHORT).show()
+        }
+
         toggleButton.setOnClickListener {
             if (isAdvertising) {
                 stopService()
@@ -75,20 +84,19 @@ class MainActivity : AppCompatActivity() {
         try {
             val adapter = (getSystemService(BluetoothManager::class.java)).adapter ?: return
 
-            // 名称
             val name = adapter.name ?: "未知"
-            nameText.text = "蓝牙名称: $name"
+            nameText.text = "当前蓝牙名称: $name"
+            hintText.text = "↑ 请在电脑端设置中填写此名称\n如果与系统设置不一致，请关闭蓝牙再打开，然后点“刷新名称”"
 
-            // 地址
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
                 ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
                 val addr = adapter.address
                 addressText.text = if (addr == "00:00:00:00:00:00" || addr == "02:00:00:00:00:00")
-                    "蓝牙地址: 无法获取（系统限制）"
+                    "蓝牙地址: 系统限制无法读取"
                 else
                     "蓝牙地址: $addr"
             } else {
-                addressText.text = "蓝牙地址: ${adapter.address}"
+                addressText.text = "蓝牙地址: 权限不足"
             }
         } catch (e: SecurityException) {
             addressText.text = "蓝牙地址: 权限不足"
@@ -124,7 +132,6 @@ class MainActivity : AppCompatActivity() {
         isAdvertising = true
         toggleButton.text = "停止广播"
         statusText.text = "广播中..."
-        // 启动后刷新名称和地址显示
         showBluetoothInfo()
     }
 
