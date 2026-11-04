@@ -30,9 +30,6 @@ class BleAdvertiserService : Service() {
     private var screenOffReceiver: BroadcastReceiver? = null
     private lateinit var deviceGuid: UUID
 
-    private val PREFS_NAME = "ble_anchor_prefs"
-    private val KEY_CUSTOM_NAME = "custom_bt_name"
-
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "服务创建")
@@ -47,7 +44,6 @@ class BleAdvertiserService : Service() {
         when (intent?.action) {
             "START" -> {
                 startForeground(NOTIFICATION_ID, buildNotification("正在启动..."))
-                ensureBluetoothName()
                 startBleAdvertising()
             }
             "STOP" -> {
@@ -60,25 +56,6 @@ class BleAdvertiserService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
-    private fun ensureBluetoothName() {
-        try {
-            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            val savedName = prefs.getString(KEY_CUSTOM_NAME, null) ?: return
-            if (savedName.isBlank()) return
-
-            val btManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-            val adapter = btManager.adapter ?: return
-            if (adapter.name != savedName) {
-                val ok = adapter.setName(savedName)
-                Log.d(TAG, "恢复蓝牙名称 '$savedName' 结果: $ok")
-            }
-        } catch (e: SecurityException) {
-            Log.e(TAG, "恢复蓝牙名称权限不足", e)
-        } catch (e: Exception) {
-            Log.e(TAG, "恢复蓝牙名称异常", e)
-        }
-    }
 
     private fun startBleAdvertising() {
         if (isAdvertising) {
@@ -114,12 +91,12 @@ class BleAdvertiserService : Service() {
                 .addServiceUuid(serviceUuid)
                 .build()
 
-            // 扫描响应：携带设备名称（不占用主广播包，避免数据过大）
+            // 扫描响应：携带当前蓝牙名称，供电脑端识别
             val scanResponse = AdvertiseData.Builder()
-                .setIncludeDeviceName(true)   // 扫描响应中附带当前蓝牙名称
+                .setIncludeDeviceName(true)
                 .build()
 
-            Log.d(TAG, "开始广播，设备GUID: $deviceGuid，名称将通过扫描响应发送")
+            Log.d(TAG, "开始广播，设备GUID: $deviceGuid，名称通过扫描响应发送")
             advertiser?.startAdvertising(settings, advertiseData, scanResponse, object : AdvertiseCallback() {
                 override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
                     Log.d(TAG, "广播启动成功，模式: ${settingsInEffect.mode}")
