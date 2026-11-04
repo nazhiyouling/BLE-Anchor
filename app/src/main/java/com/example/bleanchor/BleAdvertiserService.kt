@@ -84,19 +84,20 @@ class BleAdvertiserService : Service() {
                 .setConnectable(true)
                 .build()
 
-            // 主广播包：只放服务 UUID，节省空间
-            val serviceUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
+            // 主广播包：16 位 UUID + 设备名称（占用小，不会超 31 字节）
+            val shortUuid = ParcelUuid.fromString("0000ABCD-0000-1000-8000-00805F9B34FB")
             val advertiseData = AdvertiseData.Builder()
-                .setIncludeDeviceName(false)
-                .addServiceUuid(serviceUuid)
+                .setIncludeDeviceName(true)      // 携带当前蓝牙名称
+                .addServiceUuid(shortUuid)
                 .build()
 
-            // 扫描响应：携带当前蓝牙名称，供电脑端识别
+            // 扫描响应包：只放 128 位 GUID
+            val guidParcel = ParcelUuid(deviceGuid)
             val scanResponse = AdvertiseData.Builder()
-                .setIncludeDeviceName(true)
+                .addServiceUuid(guidParcel)
                 .build()
 
-            Log.d(TAG, "开始广播，设备GUID: $deviceGuid，名称通过扫描响应发送")
+            Log.d(TAG, "开始广播，名称将通过主广播包发送，GUID: $deviceGuid")
             advertiser?.startAdvertising(settings, advertiseData, scanResponse, object : AdvertiseCallback() {
                 override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
                     Log.d(TAG, "广播启动成功，模式: ${settingsInEffect.mode}")
