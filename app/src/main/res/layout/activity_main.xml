@@ -32,10 +32,10 @@
             android:layout_marginTop="16dp"/>
 
         <TextView
-            android:id="@+id/current_name_text"
+            android:id="@+id/name_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="当前设备名称: 获取中..."
+            android:text="蓝牙名称: 获取中..."
             android:textSize="14sp"
             app:layout_constraintTop_toBottomOf="@id/address_text"
             app:layout_constraintStart_toStartOf="parent"
@@ -48,32 +48,10 @@
             android:layout_height="wrap_content"
             android:text="V1.0.0"
             android:textSize="12sp"
-            app:layout_constraintTop_toBottomOf="@id/current_name_text"
+            app:layout_constraintTop_toBottomOf="@id/name_text"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             android:layout_marginTop="8dp"/>
-
-        <EditText
-            android:id="@+id/name_input"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:hint="输入新的蓝牙名称（≤16字符）"
-            android:inputType="text"
-            android:maxLength="32"
-            app:layout_constraintTop_toBottomOf="@id/version_text"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/apply_name_button"
-            android:layout_marginTop="24dp"
-            android:layout_marginEnd="8dp"/>
-
-        <Button
-            android:id="@+id/apply_name_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="应用名称"
-            app:layout_constraintTop_toTopOf="@id/name_input"
-            app:layout_constraintBottom_toBottomOf="@id/name_input"
-            app:layout_constraintEnd_toEndOf="parent"/>
 
         <Button
             android:id="@+id/toggle_button"
@@ -81,7 +59,7 @@
             android:layout_height="80dp"
             android:text="开始广播"
             android:textSize="18sp"
-            app:layout_constraintTop_toBottomOf="@id/name_input"
+            app:layout_constraintTop_toBottomOf="@id/version_text"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             android:layout_marginTop="32dp"/>
